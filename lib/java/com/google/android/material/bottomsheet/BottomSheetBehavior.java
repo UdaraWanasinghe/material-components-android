@@ -627,6 +627,18 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
     // Record the velocity
     if (action == MotionEvent.ACTION_DOWN) {
       reset();
+
+      float relativeTouchX = event.getRawX();
+      float relativeTouchY = event.getRawY();
+      int[] location = tempIntArray;
+      View rootView = child.getRootView();
+      if (rootView != null) {
+        rootView.getLocationOnScreen(location);
+        relativeTouchX -= location[0];
+        relativeTouchY -= location[1];
+      }
+
+      nestedScrollingChildRef = new WeakReference<>(findScrollingChild(child, relativeTouchX, relativeTouchY));
     }
     if (velocityTracker == null) {
       velocityTracker = VelocityTracker.obtain();
@@ -696,18 +708,6 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
     // Record the velocity
     if (action == MotionEvent.ACTION_DOWN) {
       reset();
-
-      float relativeTouchX = event.getRawX();
-      float relativeTouchY = event.getRawY();
-      int[] location = tempIntArray;
-      View rootView = child.getRootView();
-      if (rootView != null) {
-        rootView.getLocationOnScreen(location);
-        relativeTouchX -= location[0];
-        relativeTouchY -= location[1];
-      }
-
-      nestedScrollingChildRef = new WeakReference<>(findScrollingChild(child, relativeTouchX, relativeTouchY));
     }
     if (velocityTracker == null) {
       velocityTracker = VelocityTracker.obtain();
