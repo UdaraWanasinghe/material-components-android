@@ -29,6 +29,7 @@ import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
@@ -345,6 +346,9 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
   @VisibleForTesting
   final SparseIntArray expandHalfwayActionIds = new SparseIntArray();
 
+  private final Rect tempRect = new Rect();
+  private final int[] tempIntArray = new int[2];
+
   public BottomSheetBehavior() {}
 
   public BottomSheetBehavior(@NonNull Context context, @Nullable AttributeSet attrs) {
@@ -606,8 +610,6 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
     }
     updateDrawableForTargetState(state, /* animate= */ false);
 
-    nestedScrollingChildRef = new WeakReference<>(findScrollingChild(child));
-
     for (int i = 0; i < callbacks.size(); i++) {
       callbacks.get(i).onLayout(child);
     }
@@ -694,6 +696,18 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
     // Record the velocity
     if (action == MotionEvent.ACTION_DOWN) {
       reset();
+
+      float relativeTouchX = event.getRawX();
+      float relativeTouchY = event.getRawY();
+      int[] location = tempIntArray;
+      View rootView = child.getRootView();
+      if (rootView != null) {
+        rootView.getLocationOnScreen(location);
+        relativeTouchX -= location[0];
+        relativeTouchY -= location[1];
+      }
+
+      nestedScrollingChildRef = new WeakReference<>(findScrollingChild(child, relativeTouchX, relativeTouchY));
     }
     if (velocityTracker == null) {
       velocityTracker = VelocityTracker.obtain();
@@ -1653,25 +1667,44 @@ public class BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behav
     return bottomContainerBackHelper;
   }
 
+  /**
+   * Finds scrolling child view in the given view
+   *
+   * @param view           View given
+   * @param relativeTouchX Touch x relative to the root view
+   * @param relativeTouchY Touch y relative to the root view
+   * @return Scrolling child view
+   */
   @Nullable
-  @VisibleForTesting
-  View findScrollingChild(View view) {
+  private View findScrollingChild(View view, float relativeTouchX, float relativeTouchY) {
     if (view.getVisibility() != View.VISIBLE) {
       return null;
     }
-    if (ViewCompat.isNestedScrollingEnabled(view)) {
+
+    if (ViewCompat.isNestedScrollingEnabled(view)
+            && isPointInVisibleViewArea(view, relativeTouchX, relativeTouchY)) {
       return view;
     }
     if (view instanceof ViewGroup) {
       ViewGroup group = (ViewGroup) view;
       for (int i = 0, count = group.getChildCount(); i < count; i++) {
-        View scrollingChild = findScrollingChild(group.getChildAt(i));
+        View scrollingChild = findScrollingChild(
+                group.getChildAt(i), relativeTouchX, relativeTouchY);
         if (scrollingChild != null) {
           return scrollingChild;
         }
       }
     }
     return null;
+  }
+
+  private boolean isPointInVisibleViewArea(View view, float relativePointX, float relativePointY) {
+    Rect rect = tempRect;
+    rect.setEmpty();
+    if (view.getGlobalVisibleRect(rect)) {
+      return rect.contains((int) relativePointX, (int) relativePointY);
+    }
+    return false;
   }
 
   private boolean shouldHandleDraggingWithHelper() {
